@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 
 import { getErrorMessage } from "@/lib/error-message";
@@ -85,12 +86,25 @@ export function SchedulerDashboard({
   return (
     <main className="dashboard-shell">
       <section className="toolbar" aria-label="Schedule actions">
-        <div>
-          <p className="eyebrow">CPU Medical Clinic</p>
-          <h1>MedClinic Scheduler</h1>
+        <div className="brand-lockup">
+          <Image
+            alt="Central Philippine University seal"
+            className="brand-mark"
+            height={64}
+            priority
+            src="/cpu-seal.png"
+            width={64}
+          />
+          <div>
+            <p className="eyebrow">CPU Medical Clinic</p>
+            <h1>MedClinic Scheduler</h1>
+          </div>
         </div>
         <div className="toolbar-actions">
-          <span className={`status-pill status-${status.kind}`}>
+          <span
+            aria-live="polite"
+            className={`status-pill status-${status.kind}`}
+          >
             {status.message}
           </span>
           <button
@@ -121,7 +135,7 @@ export function SchedulerDashboard({
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="metric-panel">
-      <span>{label}</span>
+      <span>{label} Appointments</span>
       <strong>{value}</strong>
     </div>
   );
@@ -166,20 +180,22 @@ function AppointmentTable({
                     <strong>{row.studentName}</strong>
                     <span>{row.studentNumber}</span>
                   </td>
-                  <td>
-                    {row.college}
-                    <span>Year {row.yearLevel}</span>
+                  <td data-label="College">
+                    <div className="cell-stack">
+                      <span className="cell-primary">{row.college}</span>
+                      <span className="cell-secondary">Year {row.yearLevel}</span>
+                    </div>
                   </td>
-                  <td>
+                  <td data-label="Priority">
                     <span className="priority-chip">
                       {formatPriority(row.priorityStatus)}
                     </span>
                   </td>
-                  <td>{row.appointmentDate}</td>
-                  <td>
+                  <td data-label="Date">{row.appointmentDate}</td>
+                  <td data-label="Time">
                     {row.startTime} - {row.endTime}
                   </td>
-                  <td>{row.doctorName ?? "Laboratory"}</td>
+                  <td data-label="Doctor">{row.doctorName ?? "Laboratory"}</td>
                 </tr>
               ))
             )}

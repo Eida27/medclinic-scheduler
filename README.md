@@ -24,7 +24,7 @@ psql --version
 If PowerShell cannot find `psql`, add PostgreSQL's `bin` folder to PATH. It is usually similar to:
 
 ```text
-C:\Program Files\PostgreSQL\17\bin
+C:\Program Files\PostgreSQL\18\bin
 ```
 
 ## 2. Create The Database
