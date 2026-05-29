@@ -10,16 +10,19 @@ export type SchedulableStudent = {
   priorityStatus: PriorityStatus;
 };
 
-export type AvailableSlot = {
+export type ScheduleDay = {
   id: number;
   serviceType: ServiceType;
+  scheduleDate: string;
   capacity: number;
+  arrivalWindow: string;
 };
 
 export type AppointmentDraft = {
   studentId: number;
-  timeSlotId: number;
+  scheduleDayId: number;
   serviceType: ServiceType;
+  queueNumber: number;
 };
 
 export type GenerateScheduleResult = {
@@ -37,10 +40,16 @@ export type AppointmentRow = {
   priorityStatus: PriorityStatus;
   serviceType: ServiceType;
   appointmentDate: string;
-  startTime: string;
-  endTime: string;
-  doctorName: string | null;
+  queueNumber: number;
+  arrivalWindow: string;
 };
+
+export const DEFAULT_SERVICE_CAPACITY: Record<ServiceType, number> = {
+  physical: 50,
+  laboratory: 80,
+};
+
+export const DEFAULT_ARRIVAL_WINDOW = "Morning";
 
 const priorityRank: Record<PriorityStatus, number> = {
   graduating: 0,
@@ -49,49 +58,38 @@ const priorityRank: Record<PriorityStatus, number> = {
   regular: 3,
 };
 
-export function buildAppointmentDrafts({
+type GetOrCreateScheduleDay = (
+  serviceType: ServiceType,
+  scheduleDate: string,
+) => ScheduleDay | Promise<ScheduleDay>;
+
+export async function buildAppointmentDrafts({
   students,
-  physicalSlots,
-  laboratorySlots,
+  physicalScheduleDays,
+  laboratoryScheduleDays,
+  getOrCreateScheduleDay,
 }: {
   students: SchedulableStudent[];
-  physicalSlots: AvailableSlot[];
-  laboratorySlots: AvailableSlot[];
-}): AppointmentDraft[] {
-  const orderedStudents = [...students].sort((left, right) => {
-    const priorityDifference =
-      priorityRank[left.priorityStatus] - priorityRank[right.priorityStatus];
+  physicalScheduleDays: ScheduleDay[];
+  laboratoryScheduleDays: ScheduleDay[];
+  getOrCreateScheduleDay: GetOrCreateScheduleDay;
+}): Promise<AppointmentDraft[]> {
+  const orderedStudents = orderStudents(students);
 
-    if (priorityDifference !== 0) {
-      return priorityDifference;
-    }
-
-    return left.id - right.id;
+  const physicalDrafts = await buildServiceAppointmentDrafts({
+    students: orderedStudents,
+    serviceType: "physical",
+    scheduleDays: physicalScheduleDays,
+    getOrCreateScheduleDay,
+  });
+  const laboratoryDrafts = await buildServiceAppointmentDrafts({
+    students: orderedStudents,
+    serviceType: "laboratory",
+    scheduleDays: laboratoryScheduleDays,
+    getOrCreateScheduleDay,
   });
 
-  const physicalQueue = expandSlots(physicalSlots, "physical");
-  const laboratoryQueue = expandSlots(laboratorySlots, "laboratory");
-
-  if (physicalQueue.length < orderedStudents.length) {
-    throw new Error("Not enough physical examination slots for all students.");
-  }
-
-  if (laboratoryQueue.length < orderedStudents.length) {
-    throw new Error("Not enough laboratory slots for all students.");
-  }
-
-  return orderedStudents.flatMap((student, index) => [
-    {
-      studentId: student.id,
-      timeSlotId: physicalQueue[index],
-      serviceType: "physical" as const,
-    },
-    {
-      studentId: student.id,
-      timeSlotId: laboratoryQueue[index],
-      serviceType: "laboratory" as const,
-    },
-  ]);
+  return [...physicalDrafts, ...laboratoryDrafts];
 }
 
 export async function generateSchedule(): Promise<GenerateScheduleResult> {
@@ -103,22 +101,34 @@ export async function generateSchedule(): Promise<GenerateScheduleResult> {
     await client.query("DELETE FROM appointments");
 
     const students = await loadStudents(client);
-    const physicalSlots = await loadPhysicalSlots(client);
-    const laboratorySlots = await loadLaboratorySlots(client);
+    const physicalScheduleDays = await loadScheduleDays(client, "physical");
+    const laboratoryScheduleDays = await loadScheduleDays(client, "laboratory");
 
-    const drafts = buildAppointmentDrafts({
+    const drafts = await buildAppointmentDrafts({
       students,
-      physicalSlots,
-      laboratorySlots,
+      physicalScheduleDays,
+      laboratoryScheduleDays,
+      getOrCreateScheduleDay: (serviceType, scheduleDate) =>
+        ensureScheduleDay(client, serviceType, scheduleDate),
     });
 
     for (const draft of drafts) {
       await client.query(
         `
-          INSERT INTO appointments (student_id, time_slot_id, service_type)
-          VALUES ($1, $2, $3)
+          INSERT INTO appointments (
+            student_id,
+            schedule_day_id,
+            service_type,
+            queue_number
+          )
+          VALUES ($1, $2, $3, $4)
         `,
-        [draft.studentId, draft.timeSlotId, draft.serviceType],
+        [
+          draft.studentId,
+          draft.scheduleDayId,
+          draft.serviceType,
+          draft.queueNumber,
+        ],
       );
     }
 
@@ -154,18 +164,16 @@ export async function getAppointments(): Promise<AppointmentRow[]> {
       s.year_level AS "yearLevel",
       s.priority_status AS "priorityStatus",
       a.service_type AS "serviceType",
-      ts.slot_date::text AS "appointmentDate",
-      to_char(ts.start_time, 'HH24:MI') AS "startTime",
-      to_char(ts.end_time, 'HH24:MI') AS "endTime",
-      d.full_name AS "doctorName"
+      sd.schedule_date::text AS "appointmentDate",
+      a.queue_number AS "queueNumber",
+      sd.arrival_window AS "arrivalWindow"
     FROM appointments a
     JOIN students s ON s.id = a.student_id
-    JOIN time_slots ts ON ts.id = a.time_slot_id
-    LEFT JOIN doctors d ON d.id = ts.doctor_id
+    JOIN schedule_days sd ON sd.id = a.schedule_day_id
     ORDER BY
-      ts.slot_date,
-      ts.start_time,
+      sd.schedule_date,
       CASE a.service_type WHEN 'physical' THEN 0 ELSE 1 END,
+      a.queue_number,
       s.last_name,
       s.first_name
   `);
@@ -185,42 +193,211 @@ async function loadStudents(client: PoolClient): Promise<SchedulableStudent[]> {
   return result.rows;
 }
 
-async function loadPhysicalSlots(client: PoolClient): Promise<AvailableSlot[]> {
-  const result = await client.query<AvailableSlot>(`
-    SELECT
-      ts.id,
-      ts.service_type AS "serviceType",
-      ts.capacity
-    FROM time_slots ts
-    JOIN doctors d ON d.id = ts.doctor_id
-    WHERE ts.service_type = 'physical'
-      AND d.is_available = true
-    ORDER BY ts.slot_date, ts.start_time, ts.id
-  `);
+async function loadScheduleDays(
+  client: PoolClient,
+  serviceType: ServiceType,
+): Promise<ScheduleDay[]> {
+  const result = await client.query<ScheduleDay>(
+    `
+      SELECT
+        id,
+        service_type AS "serviceType",
+        schedule_date::text AS "scheduleDate",
+        capacity,
+        arrival_window AS "arrivalWindow"
+      FROM schedule_days
+      WHERE service_type = $1
+      ORDER BY schedule_date, id
+    `,
+    [serviceType],
+  );
 
   return result.rows;
 }
 
-async function loadLaboratorySlots(client: PoolClient): Promise<AvailableSlot[]> {
-  const result = await client.query<AvailableSlot>(`
-    SELECT
-      id,
-      service_type AS "serviceType",
-      capacity
-    FROM time_slots
-    WHERE service_type = 'laboratory'
-    ORDER BY slot_date, start_time, id
-  `);
+async function ensureScheduleDay(
+  client: PoolClient,
+  serviceType: ServiceType,
+  scheduleDate: string,
+): Promise<ScheduleDay> {
+  const existing = await client.query<ScheduleDay>(
+    `
+      SELECT
+        id,
+        service_type AS "serviceType",
+        schedule_date::text AS "scheduleDate",
+        capacity,
+        arrival_window AS "arrivalWindow"
+      FROM schedule_days
+      WHERE service_type = $1
+        AND schedule_date = $2
+      LIMIT 1
+    `,
+    [serviceType, scheduleDate],
+  );
 
-  return result.rows;
+  if (existing.rows[0]) {
+    return existing.rows[0];
+  }
+
+  const inserted = await client.query<ScheduleDay>(
+    `
+      INSERT INTO schedule_days (
+        service_type,
+        schedule_date,
+        capacity,
+        arrival_window
+      )
+      VALUES ($1, $2, $3, $4)
+      RETURNING
+        id,
+        service_type AS "serviceType",
+        schedule_date::text AS "scheduleDate",
+        capacity,
+        arrival_window AS "arrivalWindow"
+    `,
+    [
+      serviceType,
+      scheduleDate,
+      DEFAULT_SERVICE_CAPACITY[serviceType],
+      DEFAULT_ARRIVAL_WINDOW,
+    ],
+  );
+
+  return inserted.rows[0];
 }
 
-function expandSlots(slots: AvailableSlot[], serviceType: ServiceType): number[] {
-  return slots.flatMap((slot) => {
-    if (slot.serviceType !== serviceType) {
-      throw new Error(`Expected ${serviceType} slot but received ${slot.serviceType}.`);
+function orderStudents(students: SchedulableStudent[]) {
+  return [...students].sort((left, right) => {
+    const priorityDifference =
+      priorityRank[left.priorityStatus] - priorityRank[right.priorityStatus];
+
+    if (priorityDifference !== 0) {
+      return priorityDifference;
     }
 
-    return Array.from({ length: slot.capacity }, () => slot.id);
+    return left.id - right.id;
   });
+}
+
+async function buildServiceAppointmentDrafts({
+  students,
+  serviceType,
+  scheduleDays,
+  getOrCreateScheduleDay,
+}: {
+  students: SchedulableStudent[];
+  serviceType: ServiceType;
+  scheduleDays: ScheduleDay[];
+  getOrCreateScheduleDay: GetOrCreateScheduleDay;
+}): Promise<AppointmentDraft[]> {
+  const scheduleDaysByDate = new Map(
+    scheduleDays
+      .filter((day) => day.serviceType === serviceType)
+      .map((day) => [day.scheduleDate, day]),
+  );
+  const firstScheduleDay = [...scheduleDaysByDate.values()]
+    .filter((day) => isWeekday(day.scheduleDate))
+    .sort((left, right) => left.scheduleDate.localeCompare(right.scheduleDate))[0];
+
+  if (!firstScheduleDay) {
+    throw new Error(`No weekday ${serviceType} schedule days are configured.`);
+  }
+
+  const drafts: AppointmentDraft[] = [];
+  let currentDate = firstScheduleDay.scheduleDate;
+  let currentScheduleDay = firstScheduleDay;
+  let queueNumber = 1;
+
+  for (const student of students) {
+    while (queueNumber > currentScheduleDay.capacity) {
+      currentDate = getNextWeekday(currentDate);
+      currentScheduleDay = await resolveScheduleDay({
+        serviceType,
+        scheduleDate: currentDate,
+        scheduleDaysByDate,
+        getOrCreateScheduleDay,
+      });
+      queueNumber = 1;
+    }
+
+    drafts.push({
+      studentId: student.id,
+      scheduleDayId: currentScheduleDay.id,
+      serviceType,
+      queueNumber,
+    });
+    queueNumber += 1;
+  }
+
+  return drafts;
+}
+
+async function resolveScheduleDay({
+  serviceType,
+  scheduleDate,
+  scheduleDaysByDate,
+  getOrCreateScheduleDay,
+}: {
+  serviceType: ServiceType;
+  scheduleDate: string;
+  scheduleDaysByDate: Map<string, ScheduleDay>;
+  getOrCreateScheduleDay: GetOrCreateScheduleDay;
+}) {
+  const existing = scheduleDaysByDate.get(scheduleDate);
+
+  if (existing) {
+    return existing;
+  }
+
+  const created = await getOrCreateScheduleDay(serviceType, scheduleDate);
+
+  if (created.serviceType !== serviceType) {
+    throw new Error(
+      `Expected ${serviceType} schedule day but received ${created.serviceType}.`,
+    );
+  }
+
+  if (created.scheduleDate !== scheduleDate) {
+    throw new Error(
+      `Expected schedule day ${scheduleDate} but received ${created.scheduleDate}.`,
+    );
+  }
+
+  scheduleDaysByDate.set(scheduleDate, created);
+  return created;
+}
+
+function getNextWeekday(dateText: string) {
+  let nextDate = addDays(dateText, 1);
+
+  while (!isWeekday(nextDate)) {
+    nextDate = addDays(nextDate, 1);
+  }
+
+  return nextDate;
+}
+
+function isWeekday(dateText: string) {
+  const day = parseDateOnly(dateText).getUTCDay();
+  return day >= 1 && day <= 5;
+}
+
+function addDays(dateText: string, amount: number) {
+  const date = parseDateOnly(dateText);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return formatDateOnly(date);
+}
+
+function parseDateOnly(dateText: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+    throw new Error(`Expected date in YYYY-MM-DD format but received ${dateText}.`);
+  }
+
+  const [year, month, day] = dateText.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function formatDateOnly(date: Date) {
+  return date.toISOString().slice(0, 10);
 }
