@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 
+import { formatArrivalWindow } from "@/lib/arrival-window";
 import { getErrorMessage } from "@/lib/error-message";
 import type { AppointmentRow, GenerateScheduleResult } from "@/lib/scheduler";
 
@@ -193,7 +194,9 @@ function AppointmentTable({
                   </td>
                   <td data-label="Date">{row.appointmentDate}</td>
                   <td data-label="Queue Number">#{row.queueNumber}</td>
-                  <td data-label="Arrival Window">{row.arrivalWindow}</td>
+                  <td data-label="Arrival Window">
+                    {formatArrivalWindow(row.arrivalWindow)}
+                  </td>
                 </tr>
               ))
             )}
