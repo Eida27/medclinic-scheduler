@@ -13,20 +13,7 @@ VALUES
   ('Dr. Roberto Cruz', true),
   ('Dr. Elena Yap', true);
 
-INSERT INTO time_slots (service_type, doctor_id, slot_date, start_time, end_time, capacity)
-SELECT 'physical', d.id, slot_date, start_time::time, end_time::time, 1
-FROM doctors d
-CROSS JOIN (
-  VALUES
-    (DATE '2026-06-01', '08:00', '08:30'),
-    (DATE '2026-06-01', '08:30', '09:00'),
-    (DATE '2026-06-01', '09:00', '09:30')
-) AS slots(slot_date, start_time, end_time)
-WHERE d.is_available = true;
-
-INSERT INTO time_slots (service_type, doctor_id, slot_date, start_time, end_time, capacity)
+INSERT INTO schedule_days (service_type, schedule_date, capacity, arrival_window)
 VALUES
-  ('laboratory', NULL, DATE '2026-06-01', '08:00', '08:30', 2),
-  ('laboratory', NULL, DATE '2026-06-01', '08:30', '09:00', 2),
-  ('laboratory', NULL, DATE '2026-06-01', '09:00', '09:30', 2),
-  ('laboratory', NULL, DATE '2026-06-01', '09:30', '10:00', 2);
+  ('physical', DATE '2026-06-01', 50, 'Morning'),
+  ('laboratory', DATE '2026-06-01', 80, 'Morning');

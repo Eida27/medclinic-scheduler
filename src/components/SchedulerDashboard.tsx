@@ -162,8 +162,8 @@ function AppointmentTable({
               <th>College</th>
               <th>Priority</th>
               <th>Date</th>
-              <th>Time</th>
-              <th>Doctor</th>
+              <th>Queue Number</th>
+              <th>Arrival Window</th>
             </tr>
           </thead>
           <tbody>
@@ -192,10 +192,8 @@ function AppointmentTable({
                     </span>
                   </td>
                   <td data-label="Date">{row.appointmentDate}</td>
-                  <td data-label="Time">
-                    {row.startTime} - {row.endTime}
-                  </td>
-                  <td data-label="Doctor">{row.doctorName ?? "Laboratory"}</td>
+                  <td data-label="Queue Number">#{row.queueNumber}</td>
+                  <td data-label="Arrival Window">{row.arrivalWindow}</td>
                 </tr>
               ))
             )}

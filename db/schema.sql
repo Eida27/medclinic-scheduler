@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS appointments;
+DROP TABLE IF EXISTS schedule_days;
 DROP TABLE IF EXISTS time_slots;
 DROP TABLE IF EXISTS doctors;
 DROP TABLE IF EXISTS students;
@@ -27,26 +28,32 @@ CREATE TABLE doctors (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE time_slots (
+CREATE TABLE schedule_days (
   id SERIAL PRIMARY KEY,
   service_type service_type NOT NULL,
-  doctor_id INTEGER REFERENCES doctors(id) ON DELETE SET NULL,
-  slot_date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  capacity INTEGER NOT NULL DEFAULT 1 CHECK (capacity > 0),
+  schedule_date DATE NOT NULL,
+  capacity INTEGER NOT NULL CHECK (capacity > 0),
+  arrival_window TEXT NOT NULL DEFAULT 'Morning',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT time_slots_valid_time CHECK (start_time < end_time)
+  CONSTRAINT schedule_days_arrival_window_not_blank CHECK (length(trim(arrival_window)) > 0),
+  CONSTRAINT schedule_days_service_date_unique UNIQUE (service_type, schedule_date),
+  CONSTRAINT schedule_days_id_service_unique UNIQUE (id, service_type)
 );
 
 CREATE TABLE appointments (
   id SERIAL PRIMARY KEY,
   student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-  time_slot_id INTEGER NOT NULL REFERENCES time_slots(id) ON DELETE CASCADE,
+  schedule_day_id INTEGER NOT NULL,
   service_type service_type NOT NULL,
+  queue_number INTEGER NOT NULL CHECK (queue_number > 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT appointments_student_service_unique UNIQUE (student_id, service_type)
+  CONSTRAINT appointments_schedule_day_service_fk
+    FOREIGN KEY (schedule_day_id, service_type)
+    REFERENCES schedule_days(id, service_type)
+    ON DELETE CASCADE,
+  CONSTRAINT appointments_student_service_unique UNIQUE (student_id, service_type),
+  CONSTRAINT appointments_schedule_day_queue_unique UNIQUE (schedule_day_id, queue_number)
 );
 
-CREATE INDEX appointments_time_slot_id_idx ON appointments(time_slot_id);
-CREATE INDEX time_slots_service_date_time_idx ON time_slots(service_type, slot_date, start_time);
+CREATE INDEX appointments_schedule_day_id_idx ON appointments(schedule_day_id);
+CREATE INDEX schedule_days_service_date_idx ON schedule_days(service_type, schedule_date);
