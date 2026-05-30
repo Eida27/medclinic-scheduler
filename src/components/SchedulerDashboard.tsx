@@ -162,6 +162,7 @@ function AppointmentTable({
               <th>Student</th>
               <th>College</th>
               <th>Priority</th>
+              <th>Deadline</th>
               <th>Date</th>
               <th>Queue Number</th>
               <th>Arrival Window</th>
@@ -170,7 +171,7 @@ function AppointmentTable({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td className="empty-cell" colSpan={6}>
+                <td className="empty-cell" colSpan={7}>
                   No appointments generated
                 </td>
               </tr>
@@ -192,6 +193,7 @@ function AppointmentTable({
                       {formatPriority(row.priorityStatus)}
                     </span>
                   </td>
+                  <td data-label="Deadline">{row.deadlineDate ?? "-"}</td>
                   <td data-label="Date">{row.appointmentDate}</td>
                   <td data-label="Queue Number">#{row.queueNumber}</td>
                   <td data-label="Arrival Window">
@@ -210,6 +212,10 @@ function AppointmentTable({
 function formatPriority(priority: AppointmentRow["priorityStatus"]) {
   if (priority === "ojt") {
     return "OJT";
+  }
+
+  if (priority === "tour") {
+    return "Tour-related";
   }
 
   return priority.charAt(0).toUpperCase() + priority.slice(1);

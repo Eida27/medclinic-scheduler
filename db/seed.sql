@@ -1,11 +1,19 @@
-INSERT INTO students (student_number, first_name, last_name, college, year_level, priority_status)
+INSERT INTO students (
+  student_number,
+  first_name,
+  last_name,
+  college,
+  year_level,
+  priority_status,
+  deadline_date
+)
 VALUES
-  ('2026-0001', 'Ana', 'Dela Cruz', 'College of Computer Studies', 4, 'graduating'),
-  ('2026-0002', 'Marco', 'Santos', 'College of Engineering', 3, 'regular'),
-  ('2026-0003', 'Lia', 'Reyes', 'College of Nursing', 4, 'ojt'),
-  ('2026-0004', 'Paolo', 'Garcia', 'College of Business and Accountancy', 2, 'regular'),
-  ('2026-0005', 'Mika', 'Villanueva', 'College of Education', 4, 'tour'),
-  ('2026-0006', 'Rafael', 'Lopez', 'College of Arts and Sciences', 1, 'regular');
+  ('2026-0001', 'Ana', 'Dela Cruz', 'College of Computer Studies', 4, 'graduating', DATE '2026-06-02'),
+  ('2026-0002', 'Marco', 'Santos', 'College of Engineering', 3, 'regular', NULL),
+  ('2026-0003', 'Lia', 'Reyes', 'College of Nursing', 4, 'ojt', DATE '2026-07-01'),
+  ('2026-0004', 'Paolo', 'Garcia', 'College of Business and Accountancy', 2, 'regular', NULL),
+  ('2026-0005', 'Mika', 'Villanueva', 'College of Education', 4, 'tour', DATE '2026-07-15'),
+  ('2026-0006', 'Rafael', 'Lopez', 'College of Arts and Sciences', 1, 'regular', NULL);
 
 INSERT INTO doctors (full_name, is_available)
 VALUES

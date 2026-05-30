@@ -8,30 +8,20 @@ import {
 } from "./scheduler";
 import type {
   AppointmentDraft,
+  PriorityStatus,
   ScheduleDay,
   ServiceType,
+  SchedulableStudent,
 } from "./scheduler";
 
 const students = [
-  {
-    id: 1,
-    priorityStatus: "regular" as const,
-  },
-  {
-    id: 2,
-    priorityStatus: "ojt" as const,
-  },
-  {
-    id: 3,
-    priorityStatus: "graduating" as const,
-  },
-  {
-    id: 4,
-    priorityStatus: "tour" as const,
-  },
+  student(1, "regular"),
+  student(2, "ojt"),
+  student(3, "graduating"),
+  student(4, "tour"),
 ];
 
-test("buildAppointmentDrafts creates queue appointments in priority order", async () => {
+test("buildAppointmentDrafts creates queue appointments in default priority order", async () => {
   const days = [
     scheduleDay(10, "physical", "2026-06-01", 4),
     scheduleDay(20, "laboratory", "2026-06-01", 4),
@@ -55,12 +45,12 @@ test("buildAppointmentDrafts creates queue appointments in priority order", asyn
       queueNumber: draft.queueNumber,
     })),
     [
-      { studentId: 3, serviceType: "physical", scheduleDayId: 10, queueNumber: 1 },
+      { studentId: 4, serviceType: "physical", scheduleDayId: 10, queueNumber: 1 },
       { studentId: 2, serviceType: "physical", scheduleDayId: 10, queueNumber: 2 },
-      { studentId: 4, serviceType: "physical", scheduleDayId: 10, queueNumber: 3 },
+      { studentId: 3, serviceType: "physical", scheduleDayId: 10, queueNumber: 3 },
       { studentId: 1, serviceType: "physical", scheduleDayId: 10, queueNumber: 4 },
       {
-        studentId: 3,
+        studentId: 4,
         serviceType: "laboratory",
         scheduleDayId: 20,
         queueNumber: 1,
@@ -72,7 +62,7 @@ test("buildAppointmentDrafts creates queue appointments in priority order", asyn
         queueNumber: 2,
       },
       {
-        studentId: 4,
+        studentId: 3,
         serviceType: "laboratory",
         scheduleDayId: 20,
         queueNumber: 3,
@@ -84,6 +74,96 @@ test("buildAppointmentDrafts creates queue appointments in priority order", asyn
         queueNumber: 4,
       },
     ],
+  );
+});
+
+test("buildAppointmentDrafts promotes urgent lower-category deadlines over nonurgent higher categories", async () => {
+  const deadlineStudents = [
+    student(1, "ojt", "2026-07-01"),
+    student(2, "graduating", "2026-06-02"),
+    student(3, "tour", "2026-07-15"),
+    student(4, "regular", null),
+  ];
+  const days = [
+    scheduleDay(10, "physical", "2026-06-01", 4),
+    scheduleDay(20, "laboratory", "2026-06-01", 4),
+  ];
+  const { getOrCreateScheduleDay } = createScheduleDayStore(days);
+
+  const drafts = await buildAppointmentDrafts({
+    students: deadlineStudents,
+    physicalScheduleDays: days.filter((day) => day.serviceType === "physical"),
+    laboratoryScheduleDays: days.filter(
+      (day) => day.serviceType === "laboratory",
+    ),
+    getOrCreateScheduleDay,
+  });
+
+  assert.deepEqual(
+    drafts
+      .filter((draft) => draft.serviceType === "physical")
+      .map((draft) => draft.studentId),
+    [2, 3, 1, 4],
+  );
+});
+
+test("buildAppointmentDrafts sorts urgent students by deadline before category", async () => {
+  const deadlineStudents = [
+    student(1, "tour", "2026-06-07"),
+    student(2, "ojt", "2026-06-03"),
+    student(3, "graduating", "2026-06-02"),
+    student(4, "regular", "2026-06-01"),
+  ];
+  const days = [
+    scheduleDay(10, "physical", "2026-06-01", 4),
+    scheduleDay(20, "laboratory", "2026-06-01", 4),
+  ];
+  const { getOrCreateScheduleDay } = createScheduleDayStore(days);
+
+  const drafts = await buildAppointmentDrafts({
+    students: deadlineStudents,
+    physicalScheduleDays: days.filter((day) => day.serviceType === "physical"),
+    laboratoryScheduleDays: days.filter(
+      (day) => day.serviceType === "laboratory",
+    ),
+    getOrCreateScheduleDay,
+  });
+
+  assert.deepEqual(
+    drafts
+      .filter((draft) => draft.serviceType === "physical")
+      .map((draft) => draft.studentId),
+    [4, 3, 2, 1],
+  );
+});
+
+test("buildAppointmentDrafts sorts nonurgent students by category then deadline with nulls last", async () => {
+  const deadlineStudents = [
+    student(1, "regular", null),
+    student(2, "regular", "2026-07-01"),
+    student(3, "tour", null),
+    student(4, "tour", "2026-07-10"),
+  ];
+  const days = [
+    scheduleDay(10, "physical", "2026-06-01", 4),
+    scheduleDay(20, "laboratory", "2026-06-01", 4),
+  ];
+  const { getOrCreateScheduleDay } = createScheduleDayStore(days);
+
+  const drafts = await buildAppointmentDrafts({
+    students: deadlineStudents,
+    physicalScheduleDays: days.filter((day) => day.serviceType === "physical"),
+    laboratoryScheduleDays: days.filter(
+      (day) => day.serviceType === "laboratory",
+    ),
+    getOrCreateScheduleDay,
+  });
+
+  assert.deepEqual(
+    drafts
+      .filter((draft) => draft.serviceType === "physical")
+      .map((draft) => draft.studentId),
+    [4, 3, 2, 1],
   );
 });
 
@@ -114,9 +194,9 @@ test("buildAppointmentDrafts overflows capacity onto the next weekday", async ()
       queueNumber: draft.queueNumber,
     })),
     [
-      { studentId: 3, date: "2026-06-01", queueNumber: 1 },
+      { studentId: 4, date: "2026-06-01", queueNumber: 1 },
       { studentId: 2, date: "2026-06-01", queueNumber: 2 },
-      { studentId: 4, date: "2026-06-02", queueNumber: 1 },
+      { studentId: 3, date: "2026-06-02", queueNumber: 1 },
       { studentId: 1, date: "2026-06-02", queueNumber: 2 },
     ],
   );
@@ -192,6 +272,18 @@ test("buildAppointmentDrafts requires a configured weekday schedule day", async 
     /No weekday physical schedule days are configured/,
   );
 });
+
+function student(
+  id: number,
+  priorityStatus: PriorityStatus,
+  deadlineDate: string | null = null,
+): SchedulableStudent {
+  return {
+    id,
+    priorityStatus,
+    deadlineDate,
+  };
+}
 
 function scheduleDay(
   id: number,

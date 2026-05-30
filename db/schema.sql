@@ -18,6 +18,7 @@ CREATE TABLE students (
   college TEXT NOT NULL,
   year_level INTEGER NOT NULL CHECK (year_level BETWEEN 1 AND 5),
   priority_status priority_status NOT NULL DEFAULT 'regular',
+  deadline_date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

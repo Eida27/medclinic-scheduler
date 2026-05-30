@@ -8,6 +8,7 @@ export type ServiceType = "physical" | "laboratory";
 export type SchedulableStudent = {
   id: number;
   priorityStatus: PriorityStatus;
+  deadlineDate: string | null;
 };
 
 export type ScheduleDay = {
@@ -38,6 +39,7 @@ export type AppointmentRow = {
   college: string;
   yearLevel: number;
   priorityStatus: PriorityStatus;
+  deadlineDate: string | null;
   serviceType: ServiceType;
   appointmentDate: string;
   queueNumber: number;
@@ -52,11 +54,13 @@ export const DEFAULT_SERVICE_CAPACITY: Record<ServiceType, number> = {
 export const DEFAULT_ARRIVAL_WINDOW = "Morning";
 
 const priorityRank: Record<PriorityStatus, number> = {
-  graduating: 0,
+  tour: 0,
   ojt: 1,
-  tour: 2,
+  graduating: 2,
   regular: 3,
 };
+
+const URGENT_DEADLINE_WINDOW_DAYS = 7;
 
 type GetOrCreateScheduleDay = (
   serviceType: ServiceType,
@@ -74,7 +78,11 @@ export async function buildAppointmentDrafts({
   laboratoryScheduleDays: ScheduleDay[];
   getOrCreateScheduleDay: GetOrCreateScheduleDay;
 }): Promise<AppointmentDraft[]> {
-  const orderedStudents = orderStudents(students);
+  const urgencyReferenceDate = getEarliestWeekdayScheduleDate([
+    ...physicalScheduleDays,
+    ...laboratoryScheduleDays,
+  ]);
+  const orderedStudents = orderStudents(students, urgencyReferenceDate);
 
   const physicalDrafts = await buildServiceAppointmentDrafts({
     students: orderedStudents,
@@ -163,6 +171,7 @@ export async function getAppointments(): Promise<AppointmentRow[]> {
       s.college,
       s.year_level AS "yearLevel",
       s.priority_status AS "priorityStatus",
+      s.deadline_date::text AS "deadlineDate",
       a.service_type AS "serviceType",
       sd.schedule_date::text AS "appointmentDate",
       a.queue_number AS "queueNumber",
@@ -185,7 +194,8 @@ async function loadStudents(client: PoolClient): Promise<SchedulableStudent[]> {
   const result = await client.query<SchedulableStudent>(`
     SELECT
       id,
-      priority_status AS "priorityStatus"
+      priority_status AS "priorityStatus",
+      deadline_date::text AS "deadlineDate"
     FROM students
     ORDER BY id
   `);
@@ -267,8 +277,33 @@ async function ensureScheduleDay(
   return inserted.rows[0];
 }
 
-function orderStudents(students: SchedulableStudent[]) {
+function orderStudents(
+  students: SchedulableStudent[],
+  urgencyReferenceDate: string | undefined,
+) {
+  const urgentDeadlineCutoff = urgencyReferenceDate
+    ? addDays(urgencyReferenceDate, URGENT_DEADLINE_WINDOW_DAYS)
+    : undefined;
+
   return [...students].sort((left, right) => {
+    const leftIsUrgent = hasUrgentDeadline(left, urgentDeadlineCutoff);
+    const rightIsUrgent = hasUrgentDeadline(right, urgentDeadlineCutoff);
+
+    if (leftIsUrgent !== rightIsUrgent) {
+      return leftIsUrgent ? -1 : 1;
+    }
+
+    if (leftIsUrgent && rightIsUrgent) {
+      const deadlineDifference = compareDeadlineDates(
+        left.deadlineDate,
+        right.deadlineDate,
+      );
+
+      if (deadlineDifference !== 0) {
+        return deadlineDifference;
+      }
+    }
+
     const priorityDifference =
       priorityRank[left.priorityStatus] - priorityRank[right.priorityStatus];
 
@@ -276,8 +311,51 @@ function orderStudents(students: SchedulableStudent[]) {
       return priorityDifference;
     }
 
+    const deadlineDifference = compareDeadlineDates(
+      left.deadlineDate,
+      right.deadlineDate,
+    );
+
+    if (deadlineDifference !== 0) {
+      return deadlineDifference;
+    }
+
     return left.id - right.id;
   });
+}
+
+function getEarliestWeekdayScheduleDate(scheduleDays: ScheduleDay[]) {
+  return scheduleDays
+    .map((day) => day.scheduleDate)
+    .filter(isWeekday)
+    .sort((left, right) => left.localeCompare(right))[0];
+}
+
+function hasUrgentDeadline(
+  student: SchedulableStudent,
+  urgentDeadlineCutoff: string | undefined,
+) {
+  return Boolean(
+    student.deadlineDate &&
+      urgentDeadlineCutoff &&
+      student.deadlineDate <= urgentDeadlineCutoff,
+  );
+}
+
+function compareDeadlineDates(left: string | null, right: string | null) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (left === null) {
+    return 1;
+  }
+
+  if (right === null) {
+    return -1;
+  }
+
+  return left.localeCompare(right);
 }
 
 async function buildServiceAppointmentDrafts({

@@ -19,3 +19,16 @@ test("dashboard uses the CPU seal and gold-blue theme tokens", () => {
   assert.match(css, /--cpu-gold:\s*#ffd23f;/);
   assert.ok(existsSync(sealPath), "CPU seal asset should exist");
 });
+
+test("dashboard shows deadline-aware scheduling details", () => {
+  const dashboard = readFileSync(
+    join(root, "src", "components", "SchedulerDashboard.tsx"),
+    "utf8",
+  );
+
+  assert.match(dashboard, /<th>Deadline<\/th>/);
+  assert.match(dashboard, /data-label="Deadline"/);
+  assert.match(dashboard, /row\.deadlineDate \?\? "-"/);
+  assert.match(dashboard, /return "Tour-related";/);
+  assert.match(dashboard, /colSpan=\{7\}/);
+});
