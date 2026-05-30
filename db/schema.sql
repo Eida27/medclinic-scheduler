@@ -11,15 +11,15 @@ CREATE TYPE service_type AS ENUM ('physical', 'laboratory');
 CREATE TYPE priority_status AS ENUM ('regular', 'ojt', 'graduating', 'tour');
 
 CREATE TABLE students (
-  id SERIAL PRIMARY KEY,
-  student_number TEXT NOT NULL UNIQUE,
+  student_number TEXT PRIMARY KEY,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
   college TEXT NOT NULL,
   year_level INTEGER NOT NULL CHECK (year_level BETWEEN 1 AND 5),
   priority_status priority_status NOT NULL DEFAULT 'regular',
   deadline_date DATE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT students_student_number_format CHECK (student_number ~ '^[0-9]{2}-[0-9]{4}-[0-9]{2}$')
 );
 
 CREATE TABLE doctors (
@@ -43,7 +43,7 @@ CREATE TABLE schedule_days (
 
 CREATE TABLE appointments (
   id SERIAL PRIMARY KEY,
-  student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  student_number TEXT NOT NULL REFERENCES students(student_number) ON DELETE CASCADE,
   schedule_day_id INTEGER NOT NULL,
   service_type service_type NOT NULL,
   queue_number INTEGER NOT NULL CHECK (queue_number > 0),
@@ -52,7 +52,7 @@ CREATE TABLE appointments (
     FOREIGN KEY (schedule_day_id, service_type)
     REFERENCES schedule_days(id, service_type)
     ON DELETE CASCADE,
-  CONSTRAINT appointments_student_service_unique UNIQUE (student_id, service_type),
+  CONSTRAINT appointments_student_service_unique UNIQUE (student_number, service_type),
   CONSTRAINT appointments_schedule_day_queue_unique UNIQUE (schedule_day_id, queue_number)
 );
 

@@ -6,7 +6,7 @@ export type PriorityStatus = "regular" | "ojt" | "graduating" | "tour";
 export type ServiceType = "physical" | "laboratory";
 
 export type SchedulableStudent = {
-  id: number;
+  studentNumber: string;
   priorityStatus: PriorityStatus;
   deadlineDate: string | null;
 };
@@ -20,7 +20,7 @@ export type ScheduleDay = {
 };
 
 export type AppointmentDraft = {
-  studentId: number;
+  studentNumber: string;
   scheduleDayId: number;
   serviceType: ServiceType;
   queueNumber: number;
@@ -124,7 +124,7 @@ export async function generateSchedule(): Promise<GenerateScheduleResult> {
       await client.query(
         `
           INSERT INTO appointments (
-            student_id,
+            student_number,
             schedule_day_id,
             service_type,
             queue_number
@@ -132,7 +132,7 @@ export async function generateSchedule(): Promise<GenerateScheduleResult> {
           VALUES ($1, $2, $3, $4)
         `,
         [
-          draft.studentId,
+          draft.studentNumber,
           draft.scheduleDayId,
           draft.serviceType,
           draft.queueNumber,
@@ -177,7 +177,7 @@ export async function getAppointments(): Promise<AppointmentRow[]> {
       a.queue_number AS "queueNumber",
       sd.arrival_window AS "arrivalWindow"
     FROM appointments a
-    JOIN students s ON s.id = a.student_id
+    JOIN students s ON s.student_number = a.student_number
     JOIN schedule_days sd ON sd.id = a.schedule_day_id
     ORDER BY
       sd.schedule_date,
@@ -193,11 +193,11 @@ export async function getAppointments(): Promise<AppointmentRow[]> {
 async function loadStudents(client: PoolClient): Promise<SchedulableStudent[]> {
   const result = await client.query<SchedulableStudent>(`
     SELECT
-      id,
+      student_number AS "studentNumber",
       priority_status AS "priorityStatus",
       deadline_date::text AS "deadlineDate"
     FROM students
-    ORDER BY id
+    ORDER BY student_number
   `);
 
   return result.rows;
@@ -320,7 +320,7 @@ function orderStudents(
       return deadlineDifference;
     }
 
-    return left.id - right.id;
+    return left.studentNumber.localeCompare(right.studentNumber);
   });
 }
 
@@ -400,7 +400,7 @@ async function buildServiceAppointmentDrafts({
     }
 
     drafts.push({
-      studentId: student.id,
+      studentNumber: student.studentNumber,
       scheduleDayId: currentScheduleDay.id,
       serviceType,
       queueNumber,
