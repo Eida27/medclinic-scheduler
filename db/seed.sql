@@ -8,12 +8,12 @@ INSERT INTO students (
   deadline_date
 )
 VALUES
-  ('2026-0001', 'Ana', 'Dela Cruz', 'College of Computer Studies', 4, 'graduating', DATE '2026-06-02'),
-  ('2026-0002', 'Marco', 'Santos', 'College of Engineering', 3, 'regular', NULL),
-  ('2026-0003', 'Lia', 'Reyes', 'College of Nursing', 4, 'ojt', DATE '2026-07-01'),
-  ('2026-0004', 'Paolo', 'Garcia', 'College of Business and Accountancy', 2, 'regular', NULL),
-  ('2026-0005', 'Mika', 'Villanueva', 'College of Education', 4, 'tour', DATE '2026-07-15'),
-  ('2026-0006', 'Rafael', 'Lopez', 'College of Arts and Sciences', 1, 'regular', NULL);
+  ('23-1212-97', 'Ana', 'Dela Cruz', 'College of Computer Studies', 4, 'graduating', DATE '2026-06-02'),
+  ('23-1213-98', 'Marco', 'Santos', 'College of Engineering', 3, 'regular', NULL),
+  ('23-1214-99', 'Lia', 'Reyes', 'College of Nursing', 4, 'ojt', DATE '2026-07-01'),
+  ('23-1215-00', 'Paolo', 'Garcia', 'College of Business and Accountancy', 2, 'regular', NULL),
+  ('23-1216-01', 'Mika', 'Villanueva', 'College of Education', 4, 'tour', DATE '2026-07-15'),
+  ('23-1217-02', 'Rafael', 'Lopez', 'College of Arts and Sciences', 1, 'regular', NULL);
 
 INSERT INTO doctors (full_name, is_available)
 VALUES

@@ -15,10 +15,10 @@ import type {
 } from "./scheduler";
 
 const students = [
-  student(1, "regular"),
-  student(2, "ojt"),
-  student(3, "graduating"),
-  student(4, "tour"),
+  student("23-1212-97", "regular"),
+  student("23-1213-98", "ojt"),
+  student("23-1214-99", "graduating"),
+  student("23-1215-00", "tour"),
 ];
 
 test("buildAppointmentDrafts creates queue appointments in default priority order", async () => {
@@ -39,36 +39,56 @@ test("buildAppointmentDrafts creates queue appointments in default priority orde
 
   assert.deepEqual(
     drafts.map((draft) => ({
-      studentId: draft.studentId,
+      studentNumber: draft.studentNumber,
       serviceType: draft.serviceType,
       scheduleDayId: draft.scheduleDayId,
       queueNumber: draft.queueNumber,
     })),
     [
-      { studentId: 4, serviceType: "physical", scheduleDayId: 10, queueNumber: 1 },
-      { studentId: 2, serviceType: "physical", scheduleDayId: 10, queueNumber: 2 },
-      { studentId: 3, serviceType: "physical", scheduleDayId: 10, queueNumber: 3 },
-      { studentId: 1, serviceType: "physical", scheduleDayId: 10, queueNumber: 4 },
       {
-        studentId: 4,
+        studentNumber: "23-1215-00",
+        serviceType: "physical",
+        scheduleDayId: 10,
+        queueNumber: 1,
+      },
+      {
+        studentNumber: "23-1213-98",
+        serviceType: "physical",
+        scheduleDayId: 10,
+        queueNumber: 2,
+      },
+      {
+        studentNumber: "23-1214-99",
+        serviceType: "physical",
+        scheduleDayId: 10,
+        queueNumber: 3,
+      },
+      {
+        studentNumber: "23-1212-97",
+        serviceType: "physical",
+        scheduleDayId: 10,
+        queueNumber: 4,
+      },
+      {
+        studentNumber: "23-1215-00",
         serviceType: "laboratory",
         scheduleDayId: 20,
         queueNumber: 1,
       },
       {
-        studentId: 2,
+        studentNumber: "23-1213-98",
         serviceType: "laboratory",
         scheduleDayId: 20,
         queueNumber: 2,
       },
       {
-        studentId: 3,
+        studentNumber: "23-1214-99",
         serviceType: "laboratory",
         scheduleDayId: 20,
         queueNumber: 3,
       },
       {
-        studentId: 1,
+        studentNumber: "23-1212-97",
         serviceType: "laboratory",
         scheduleDayId: 20,
         queueNumber: 4,
@@ -79,10 +99,10 @@ test("buildAppointmentDrafts creates queue appointments in default priority orde
 
 test("buildAppointmentDrafts promotes urgent lower-category deadlines over nonurgent higher categories", async () => {
   const deadlineStudents = [
-    student(1, "ojt", "2026-07-01"),
-    student(2, "graduating", "2026-06-02"),
-    student(3, "tour", "2026-07-15"),
-    student(4, "regular", null),
+    student("23-1212-97", "ojt", "2026-07-01"),
+    student("23-1213-98", "graduating", "2026-06-02"),
+    student("23-1214-99", "tour", "2026-07-15"),
+    student("23-1215-00", "regular", null),
   ];
   const days = [
     scheduleDay(10, "physical", "2026-06-01", 4),
@@ -102,17 +122,17 @@ test("buildAppointmentDrafts promotes urgent lower-category deadlines over nonur
   assert.deepEqual(
     drafts
       .filter((draft) => draft.serviceType === "physical")
-      .map((draft) => draft.studentId),
-    [2, 3, 1, 4],
+      .map((draft) => draft.studentNumber),
+    ["23-1213-98", "23-1214-99", "23-1212-97", "23-1215-00"],
   );
 });
 
 test("buildAppointmentDrafts sorts urgent students by deadline before category", async () => {
   const deadlineStudents = [
-    student(1, "tour", "2026-06-07"),
-    student(2, "ojt", "2026-06-03"),
-    student(3, "graduating", "2026-06-02"),
-    student(4, "regular", "2026-06-01"),
+    student("23-1212-97", "tour", "2026-06-07"),
+    student("23-1213-98", "ojt", "2026-06-03"),
+    student("23-1214-99", "graduating", "2026-06-02"),
+    student("23-1215-00", "regular", "2026-06-01"),
   ];
   const days = [
     scheduleDay(10, "physical", "2026-06-01", 4),
@@ -132,17 +152,17 @@ test("buildAppointmentDrafts sorts urgent students by deadline before category",
   assert.deepEqual(
     drafts
       .filter((draft) => draft.serviceType === "physical")
-      .map((draft) => draft.studentId),
-    [4, 3, 2, 1],
+      .map((draft) => draft.studentNumber),
+    ["23-1215-00", "23-1214-99", "23-1213-98", "23-1212-97"],
   );
 });
 
 test("buildAppointmentDrafts sorts nonurgent students by category then deadline with nulls last", async () => {
   const deadlineStudents = [
-    student(1, "regular", null),
-    student(2, "regular", "2026-07-01"),
-    student(3, "tour", null),
-    student(4, "tour", "2026-07-10"),
+    student("23-1212-97", "regular", null),
+    student("23-1213-98", "regular", "2026-07-01"),
+    student("23-1214-99", "tour", null),
+    student("23-1215-00", "tour", "2026-07-10"),
   ];
   const days = [
     scheduleDay(10, "physical", "2026-06-01", 4),
@@ -162,8 +182,8 @@ test("buildAppointmentDrafts sorts nonurgent students by category then deadline 
   assert.deepEqual(
     drafts
       .filter((draft) => draft.serviceType === "physical")
-      .map((draft) => draft.studentId),
-    [4, 3, 2, 1],
+      .map((draft) => draft.studentNumber),
+    ["23-1215-00", "23-1214-99", "23-1213-98", "23-1212-97"],
   );
 });
 
@@ -189,15 +209,31 @@ test("buildAppointmentDrafts overflows capacity onto the next weekday", async ()
 
   assert.deepEqual(
     physicalDrafts.map((draft) => ({
-      studentId: draft.studentId,
+      studentNumber: draft.studentNumber,
       date: store.dateForDraft(draft),
       queueNumber: draft.queueNumber,
     })),
     [
-      { studentId: 4, date: "2026-06-01", queueNumber: 1 },
-      { studentId: 2, date: "2026-06-01", queueNumber: 2 },
-      { studentId: 3, date: "2026-06-02", queueNumber: 1 },
-      { studentId: 1, date: "2026-06-02", queueNumber: 2 },
+      {
+        studentNumber: "23-1215-00",
+        date: "2026-06-01",
+        queueNumber: 1,
+      },
+      {
+        studentNumber: "23-1213-98",
+        date: "2026-06-01",
+        queueNumber: 2,
+      },
+      {
+        studentNumber: "23-1214-99",
+        date: "2026-06-02",
+        queueNumber: 1,
+      },
+      {
+        studentNumber: "23-1212-97",
+        date: "2026-06-02",
+        queueNumber: 2,
+      },
     ],
   );
 });
@@ -223,11 +259,11 @@ test("buildAppointmentDrafts schedules physical and laboratory queues independen
   });
 
   assert.equal(
-    store.dateForStudent(drafts, 3, "physical"),
+    store.dateForStudent(drafts, "23-1214-99", "physical"),
     "2026-06-02",
   );
   assert.equal(
-    store.dateForStudent(drafts, 3, "laboratory"),
+    store.dateForStudent(drafts, "23-1214-99", "laboratory"),
     "2026-06-01",
   );
 });
@@ -249,11 +285,11 @@ test("buildAppointmentDrafts skips weekends when creating overflow days", async 
   });
 
   assert.equal(
-    store.dateForStudent(drafts, 2, "physical"),
+    store.dateForStudent(drafts, "23-1213-98", "physical"),
     "2026-06-05",
   );
   assert.equal(
-    store.dateForStudent(drafts, 1, "physical"),
+    store.dateForStudent(drafts, "23-1212-97", "physical"),
     "2026-06-08",
   );
 });
@@ -274,12 +310,12 @@ test("buildAppointmentDrafts requires a configured weekday schedule day", async 
 });
 
 function student(
-  id: number,
+  studentNumber: string,
   priorityStatus: PriorityStatus,
   deadlineDate: string | null = null,
 ): SchedulableStudent {
   return {
-    id,
+    studentNumber,
     priorityStatus,
     deadlineDate,
   };
@@ -341,12 +377,12 @@ function createScheduleDayStore(initialDays: ScheduleDay[]) {
     dateForDraft,
     dateForStudent(
       drafts: AppointmentDraft[],
-      studentId: number,
+      studentNumber: string,
       serviceType: ServiceType,
     ) {
       const draft = drafts.find(
         (candidate) =>
-          candidate.studentId === studentId &&
+          candidate.studentNumber === studentNumber &&
           candidate.serviceType === serviceType,
       );
 
