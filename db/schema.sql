@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS appointments;
+DROP TABLE IF EXISTS doctor_unavailabilities;
 DROP TABLE IF EXISTS schedule_days;
 DROP TABLE IF EXISTS time_slots;
 DROP TABLE IF EXISTS doctors;
@@ -26,14 +27,25 @@ CREATE TABLE doctors (
   id SERIAL PRIMARY KEY,
   full_name TEXT NOT NULL,
   is_available BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  daily_physical_capacity INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT doctors_daily_physical_capacity_nonnegative CHECK (daily_physical_capacity >= 0)
+);
+
+CREATE TABLE doctor_unavailabilities (
+  id SERIAL PRIMARY KEY,
+  doctor_id INTEGER NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+  unavailable_date DATE NOT NULL,
+  reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT doctor_unavailabilities_doctor_date_unique UNIQUE (doctor_id, unavailable_date)
 );
 
 CREATE TABLE schedule_days (
   id SERIAL PRIMARY KEY,
   service_type service_type NOT NULL,
   schedule_date DATE NOT NULL,
-  capacity INTEGER NOT NULL CHECK (capacity > 0),
+  capacity INTEGER NOT NULL CHECK (capacity >= 0),
   arrival_window TEXT NOT NULL DEFAULT 'Morning',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT schedule_days_arrival_window_not_blank CHECK (length(trim(arrival_window)) > 0),
@@ -58,3 +70,4 @@ CREATE TABLE appointments (
 
 CREATE INDEX appointments_schedule_day_id_idx ON appointments(schedule_day_id);
 CREATE INDEX schedule_days_service_date_idx ON schedule_days(service_type, schedule_date);
+CREATE INDEX doctor_unavailabilities_unavailable_date_idx ON doctor_unavailabilities(unavailable_date);

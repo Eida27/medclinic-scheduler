@@ -59,7 +59,10 @@ textarea {
 }
 
 button:focus-visible,
-a:focus-visible {
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid rgba(255, 210, 63, 0.7);
   outline-offset: 3px;
 }
@@ -123,6 +126,7 @@ h1 {
 
 .status-pill,
 .primary-button,
+.secondary-button,
 .priority-chip {
   min-height: 38px;
   display: inline-flex;
@@ -192,6 +196,31 @@ h1 {
   transform: none;
 }
 
+.secondary-button {
+  border: 1px solid rgba(37, 38, 111, 0.28);
+  padding: 0 16px;
+  background: #ffffff;
+  color: var(--cpu-blue-dark);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 900;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: var(--cpu-blue);
+  box-shadow: 0 8px 18px rgba(37, 38, 111, 0.14);
+  transform: translateY(-1px);
+}
+
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.66;
+}
+
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -200,6 +229,7 @@ h1 {
 }
 
 .metric-panel,
+.doctor-unavailability-panel,
 .table-panel {
   border: 1px solid var(--panel-border);
   border-radius: 8px;
@@ -236,6 +266,53 @@ h1 {
   color: var(--cpu-blue-dark);
   font-size: 2.15rem;
   line-height: 1;
+}
+
+.doctor-unavailability-panel {
+  margin: 0 0 18px;
+  overflow: hidden;
+}
+
+.doctor-unavailability-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(150px, 0.8fr) minmax(
+      180px,
+      1fr
+    ) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 16px 18px 18px;
+}
+
+.form-field {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.form-field span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.form-field input,
+.form-field select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--foreground);
+  padding: 0 11px;
+}
+
+.form-field input:disabled,
+.form-field select:disabled {
+  background: #f4f6fb;
+  color: var(--muted);
+  cursor: not-allowed;
 }
 
 .schedule-layout {
@@ -410,6 +487,15 @@ tbody tr:hover td {
 
   .metrics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .doctor-unavailability-form {
+    grid-template-columns: 1fr;
+    padding: 14px 16px 16px;
+  }
+
+  .secondary-button {
+    width: 100%;
   }
 
   .table-scroll {

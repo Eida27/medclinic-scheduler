@@ -4,11 +4,13 @@ import test from "node:test";
 import {
   DEFAULT_ARRIVAL_WINDOW,
   DEFAULT_SERVICE_CAPACITY,
+  buildPhysicalUnavailabilityRecomputePlan,
   buildAppointmentDrafts,
 } from "./scheduler";
 import type {
   AppointmentDraft,
   PriorityStatus,
+  RecomputableAppointment,
   ScheduleDay,
   ServiceType,
   SchedulableStudent,
@@ -309,6 +311,144 @@ test("buildAppointmentDrafts requires a configured weekday schedule day", async 
   );
 });
 
+test("buildPhysicalUnavailabilityRecomputePlan shifts only overflow when capacity drops", async () => {
+  const days = [
+    scheduleDay(10, "physical", "2026-06-01", 2),
+    scheduleDay(11, "physical", "2026-06-02", 4),
+  ];
+  const store = createScheduleDayStore(days);
+
+  const result = await buildPhysicalUnavailabilityRecomputePlan({
+    appointments: [
+      recomputableAppointment(
+        1,
+        "23-1212-97",
+        "physical",
+        10,
+        "2026-06-01",
+        1,
+      ),
+      recomputableAppointment(
+        2,
+        "23-1213-98",
+        "physical",
+        10,
+        "2026-06-01",
+        2,
+      ),
+      recomputableAppointment(
+        3,
+        "23-1214-99",
+        "physical",
+        10,
+        "2026-06-01",
+        3,
+      ),
+      recomputableAppointment(
+        4,
+        "23-1215-00",
+        "physical",
+        10,
+        "2026-06-01",
+        4,
+      ),
+    ],
+    firstAffectedDate: "2026-06-01",
+    scheduleDays: days,
+    getOrCreateScheduleDay: store.getOrCreateScheduleDay,
+  });
+
+  assert.deepEqual(
+    result.drafts.map((draft) => ({
+      appointmentId: draft.appointmentId,
+      date: store.dateForDraft(draft),
+      queueNumber: draft.queueNumber,
+    })),
+    [
+      { appointmentId: 1, date: "2026-06-01", queueNumber: 1 },
+      { appointmentId: 2, date: "2026-06-01", queueNumber: 2 },
+      { appointmentId: 3, date: "2026-06-02", queueNumber: 1 },
+      { appointmentId: 4, date: "2026-06-02", queueNumber: 2 },
+    ],
+  );
+  assert.equal(result.movedAppointments, 2);
+  assert.deepEqual(result.affectedDates, ["2026-06-01", "2026-06-02"]);
+  assert.deepEqual(result.untouchedAppointmentIds, []);
+});
+
+test("buildPhysicalUnavailabilityRecomputePlan excludes earlier physical and laboratory appointments", async () => {
+  const days = [
+    scheduleDay(10, "physical", "2026-06-01", 1),
+    scheduleDay(11, "physical", "2026-06-02", 2),
+  ];
+  const store = createScheduleDayStore(days);
+
+  const result = await buildPhysicalUnavailabilityRecomputePlan({
+    appointments: [
+      recomputableAppointment(
+        1,
+        "23-1212-97",
+        "physical",
+        9,
+        "2026-05-29",
+        1,
+      ),
+      recomputableAppointment(
+        2,
+        "23-1213-98",
+        "laboratory",
+        20,
+        "2026-06-01",
+        1,
+      ),
+      recomputableAppointment(
+        3,
+        "23-1214-99",
+        "physical",
+        10,
+        "2026-06-01",
+        1,
+      ),
+      recomputableAppointment(
+        4,
+        "23-1215-00",
+        "physical",
+        10,
+        "2026-06-01",
+        2,
+      ),
+    ],
+    firstAffectedDate: "2026-06-01",
+    scheduleDays: days,
+    getOrCreateScheduleDay: store.getOrCreateScheduleDay,
+  });
+
+  assert.deepEqual(result.untouchedAppointmentIds, [1, 2]);
+  assert.deepEqual(
+    result.drafts.map((draft) => ({
+      appointmentId: draft.appointmentId,
+      serviceType: draft.serviceType,
+      date: store.dateForDraft(draft),
+      queueNumber: draft.queueNumber,
+    })),
+    [
+      {
+        appointmentId: 3,
+        serviceType: "physical",
+        date: "2026-06-01",
+        queueNumber: 1,
+      },
+      {
+        appointmentId: 4,
+        serviceType: "physical",
+        date: "2026-06-02",
+        queueNumber: 1,
+      },
+    ],
+  );
+  assert.equal(result.movedAppointments, 1);
+});
+
 function student(
   studentNumber: string,
   priorityStatus: PriorityStatus,
@@ -318,6 +458,24 @@ function student(
     studentNumber,
     priorityStatus,
     deadlineDate,
+  };
+}
+
+function recomputableAppointment(
+  id: number,
+  studentNumber: string,
+  serviceType: ServiceType,
+  scheduleDayId: number,
+  appointmentDate: string,
+  queueNumber: number,
+): RecomputableAppointment {
+  return {
+    id,
+    studentNumber,
+    serviceType,
+    scheduleDayId,
+    appointmentDate,
+    queueNumber,
   };
 }
 

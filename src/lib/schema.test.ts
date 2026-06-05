@@ -33,6 +33,39 @@ test("appointments reference student numbers instead of numeric student ids", ()
   assert.doesNotMatch(appointmentsTable, /UNIQUE \(student_id, service_type\)/);
 });
 
+test("doctors define a daily physical exam capacity quota", () => {
+  const schema = readFileSync(join(root, "db", "schema.sql"), "utf8");
+  const doctorsTable = tableDefinition(schema, "doctors");
+
+  assert.match(
+    doctorsTable,
+    /daily_physical_capacity INTEGER NOT NULL DEFAULT 0/,
+  );
+  assert.match(
+    doctorsTable,
+    /CONSTRAINT doctors_daily_physical_capacity_nonnegative CHECK \(daily_physical_capacity >= 0\)/,
+  );
+});
+
+test("doctor unavailabilities are unique per doctor and date", () => {
+  const schema = readFileSync(join(root, "db", "schema.sql"), "utf8");
+  const unavailabilitiesTable = tableDefinition(
+    schema,
+    "doctor_unavailabilities",
+  );
+
+  assert.match(
+    unavailabilitiesTable,
+    /doctor_id INTEGER NOT NULL REFERENCES doctors\(id\) ON DELETE CASCADE/,
+  );
+  assert.match(unavailabilitiesTable, /unavailable_date DATE NOT NULL/);
+  assert.match(unavailabilitiesTable, /reason TEXT/);
+  assert.match(
+    unavailabilitiesTable,
+    /CONSTRAINT doctor_unavailabilities_doctor_date_unique UNIQUE \(doctor_id, unavailable_date\)/,
+  );
+});
+
 test("seed data uses formatted student numbers", () => {
   const seed = readFileSync(join(root, "db", "seed.sql"), "utf8");
   const studentNumbers = [...seed.matchAll(/'(\d{2}-\d{4}-\d{2})'/g)].map(
