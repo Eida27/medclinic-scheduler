@@ -32,3 +32,16 @@ test("dashboard shows deadline-aware scheduling details", () => {
   assert.match(dashboard, /return "Tour-related";/);
   assert.match(dashboard, /colSpan=\{7\}/);
 });
+
+test("dashboard includes doctor unavailability recompute controls", () => {
+  const dashboard = readFileSync(
+    join(root, "src", "components", "SchedulerDashboard.tsx"),
+    "utf8",
+  );
+
+  assert.match(dashboard, /initialDoctors/);
+  assert.match(dashboard, /doctor-unavailability-form/);
+  assert.match(dashboard, /\/api\/doctor-unavailability/);
+  assert.match(dashboard, /name="unavailableDate"/);
+  assert.match(dashboard, /Record Unavailability/);
+});

@@ -9,6 +9,7 @@ Queue-based scheduling version for the CPU Medical Clinic physical examination a
 - Raw SQL schema and seed files
 - Sample students, doctors, and schedule-day capacity rows
 - `Generate Schedule` button
+- Date-specific doctor unavailability entry with physical-exam recomputation
 - Generated physical and laboratory queue appointment tables
 - Automatic weekday overflow when a service reaches daily capacity
 
@@ -57,7 +58,7 @@ To reset the database while practicing:
 psql -U postgres -d medclinic_scheduler -f db/reset.sql
 ```
 
-This project does not currently use database migrations. If you already loaded an older version of the schema, run the reset command above so the database replaces fixed `time_slots` with queue-based `schedule_days`.
+This project does not currently use database migrations. If you already loaded an older version of the schema, run the reset command above so the database replaces fixed `time_slots` with queue-based `schedule_days` and adds doctor unavailability tables.
 
 ## 5. Run The App
 

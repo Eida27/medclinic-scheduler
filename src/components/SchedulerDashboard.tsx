@@ -1,14 +1,28 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 
 import { formatArrivalWindow } from "@/lib/arrival-window";
 import { getErrorMessage } from "@/lib/error-message";
-import type { AppointmentRow, GenerateScheduleResult } from "@/lib/scheduler";
+import type {
+  AppointmentRow,
+  DoctorRow,
+  GenerateScheduleResult,
+  RecordDoctorUnavailabilityResult,
+} from "@/lib/scheduler";
 
 type AppointmentResponse = {
   appointments: AppointmentRow[];
+  error?: string;
+};
+
+type DoctorsResponse = {
+  doctors: DoctorRow[];
+  error?: string;
+};
+
+type DoctorUnavailabilityResponse = RecordDoctorUnavailabilityResult & {
   error?: string;
 };
 
@@ -20,16 +34,25 @@ type DashboardStatus =
 
 export function SchedulerDashboard({
   initialAppointments,
+  initialDoctors,
   initialStatus,
 }: {
   initialAppointments: AppointmentRow[];
+  initialDoctors: DoctorRow[];
   initialStatus: DashboardStatus;
 }) {
   const [appointments, setAppointments] =
     useState<AppointmentRow[]>(initialAppointments);
+  const [doctors, setDoctors] = useState<DoctorRow[]>(initialDoctors);
+  const [selectedDoctorId, setSelectedDoctorId] = useState(
+    initialDoctors[0]?.id.toString() ?? "",
+  );
+  const [unavailableDate, setUnavailableDate] = useState("");
+  const [reason, setReason] = useState("");
   const [status, setStatus] = useState<DashboardStatus>({
     ...initialStatus,
   });
+  const isBusy = status.kind === "loading";
 
   const grouped = useMemo(
     () => ({
@@ -54,6 +77,23 @@ export function SchedulerDashboard({
     }
 
     setAppointments(data.appointments);
+  }
+
+  async function loadDoctors() {
+    const response = await fetch("/api/doctors", {
+      cache: "no-store",
+    });
+    const data = (await response.json()) as DoctorsResponse;
+
+    if (!response.ok) {
+      throw new Error(data.error ?? "Unable to load doctors.");
+    }
+
+    setDoctors(data.doctors);
+    setSelectedDoctorId(
+      (currentDoctorId) =>
+        currentDoctorId || data.doctors[0]?.id.toString() || "",
+    );
   }
 
   async function generateSchedule() {
@@ -84,6 +124,52 @@ export function SchedulerDashboard({
     }
   }
 
+  async function recordDoctorUnavailability(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedDoctorId || !unavailableDate) {
+      setStatus({
+        kind: "error",
+        message: "Select a doctor and date",
+      });
+      return;
+    }
+
+    setStatus({ kind: "loading", message: "Recomputing" });
+
+    try {
+      const response = await fetch("/api/doctor-unavailability", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          doctorId: Number(selectedDoctorId),
+          unavailableDate,
+          reason,
+        }),
+      });
+      const data = (await response.json()) as DoctorUnavailabilityResponse;
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to record unavailability.");
+      }
+
+      setAppointments(data.appointments);
+      await loadDoctors();
+      setReason("");
+      setStatus({
+        kind: "success",
+        message: `${data.movedAppointments} appointments moved`,
+      });
+    } catch (error) {
+      setStatus({
+        kind: "error",
+        message: getErrorMessage(error, "Unable to record unavailability."),
+      });
+    }
+  }
+
   return (
     <main className="dashboard-shell">
       <section className="toolbar" aria-label="Schedule actions">
@@ -110,7 +196,7 @@ export function SchedulerDashboard({
           </span>
           <button
             className="primary-button"
-            disabled={status.kind === "loading"}
+            disabled={isBusy}
             onClick={generateSchedule}
             type="button"
           >
@@ -123,6 +209,69 @@ export function SchedulerDashboard({
         <Metric label="Total" value={appointments.length} />
         <Metric label="Physical" value={grouped.physical.length} />
         <Metric label="Laboratory" value={grouped.laboratory.length} />
+      </section>
+
+      <section
+        className="doctor-unavailability-panel"
+        aria-label="Doctor unavailability"
+      >
+        <div className="table-header">
+          <h2>Doctor Unavailability</h2>
+          <span>{doctors.length}</span>
+        </div>
+        <form
+          className="doctor-unavailability-form"
+          onSubmit={recordDoctorUnavailability}
+        >
+          <label className="form-field">
+            <span>Doctor</span>
+            <select
+              disabled={isBusy || doctors.length === 0}
+              name="doctorId"
+              onChange={(event) => setSelectedDoctorId(event.target.value)}
+              required
+              value={selectedDoctorId}
+            >
+              <option disabled value="">
+                Select doctor
+              </option>
+              {doctors.map((doctor) => (
+                <option key={doctor.id} value={doctor.id}>
+                  {doctor.fullName} ({doctor.dailyPhysicalCapacity}/day)
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            <span>Date</span>
+            <input
+              disabled={isBusy || doctors.length === 0}
+              name="unavailableDate"
+              onChange={(event) => setUnavailableDate(event.target.value)}
+              required
+              type="date"
+              value={unavailableDate}
+            />
+          </label>
+          <label className="form-field reason-field">
+            <span>Reason</span>
+            <input
+              disabled={isBusy || doctors.length === 0}
+              name="reason"
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Optional"
+              type="text"
+              value={reason}
+            />
+          </label>
+          <button
+            className="secondary-button"
+            disabled={isBusy || doctors.length === 0}
+            type="submit"
+          >
+            Record Unavailability
+          </button>
+        </form>
       </section>
 
       <section className="schedule-layout">

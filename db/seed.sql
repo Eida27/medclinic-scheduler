@@ -15,11 +15,11 @@ VALUES
   ('23-1216-01', 'Mika', 'Villanueva', 'College of Education', 4, 'tour', DATE '2026-07-15'),
   ('23-1217-02', 'Rafael', 'Lopez', 'College of Arts and Sciences', 1, 'regular', NULL);
 
-INSERT INTO doctors (full_name, is_available)
+INSERT INTO doctors (full_name, is_available, daily_physical_capacity)
 VALUES
-  ('Dr. Maria Gonzales', true),
-  ('Dr. Roberto Cruz', true),
-  ('Dr. Elena Yap', true);
+  ('Dr. Maria Gonzales', true, 20),
+  ('Dr. Roberto Cruz', true, 15),
+  ('Dr. Elena Yap', true, 15);
 
 INSERT INTO schedule_days (service_type, schedule_date, capacity, arrival_window)
 VALUES
